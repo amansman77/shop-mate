@@ -1,3 +1,4 @@
+/// <reference types="@cloudflare/workers-types" />
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
@@ -97,6 +98,67 @@ app.post('/api/images/upload', async (c) => {
     console.error('Error processing upload:', error);
     return c.json({ 
       error: 'Failed to process image upload',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      debug: {
+        errorType: error?.constructor?.name,
+        errorMessage: error instanceof Error ? error.message : String(error)
+      }
+    }, 500);
+  }
+});
+
+app.post('/api/receipts', async (c) => {
+  try {
+    console.log('Starting OCR result save process...');
+    
+    const body = await c.req.json();
+    console.log('Received OCR data:', body);
+
+    const { imageId, ocrText } = body;
+
+    if (!imageId || !ocrText) {
+      console.log('Missing required fields:', { imageId, ocrText });
+      return c.json({ 
+        error: 'Missing required fields',
+        details: 'Both imageId and ocrText are required'
+      }, 400);
+    }
+
+    // Get environment bindings
+    const env = c.env as { DB: D1Database };
+    
+    if (!env.DB) {
+      console.error('D1 database binding not found');
+      return c.json({ 
+        error: 'Database configuration error',
+        details: 'Database not properly configured',
+        debug: { env: Object.keys(c.env) }
+      }, 500);
+    }
+
+    console.log('Preparing to save OCR result:', {
+      imageId,
+      textLength: ocrText.length
+    });
+
+    // Insert OCR result into database
+    const result = await env.DB
+      .prepare('INSERT INTO receipts (image_id, ocr_text) VALUES (?, ?)')
+      .bind(imageId, ocrText)
+      .run();
+
+    console.log('OCR result saved successfully:', {
+      meta: result.meta
+    });
+
+    return c.json({
+      success: true,
+      meta: result.meta
+    });
+  } catch (error) {
+    console.error('Error saving OCR result:', error);
+    return c.json({ 
+      error: 'Failed to save OCR result',
       details: error instanceof Error ? error.message : 'Unknown error',
       debug: {
         errorType: error?.constructor?.name,

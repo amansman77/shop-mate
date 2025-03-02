@@ -20,7 +20,14 @@
 	"assets": {
 		"directory": "./public",
 		"binding": "ASSETS"
-	}
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "shop-mate-db",
+			"database_id": "175b94c0-29f0-45f4-91c7-4afda210c9f4"
+		}
+	]
   /**
    * Smart Placement
    * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

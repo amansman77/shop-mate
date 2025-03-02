@@ -131,7 +131,7 @@
             reader.readAsDataURL(file);
         }
 
-        async function processOCR(file) {
+        async function processOCR(file, imageId) {
             try {
                 showResult('OCR 처리 중...', 'text-blue-600');
                 
@@ -141,6 +141,22 @@
                 
                 const { data: { text } } = await worker.recognize(file);
                 await worker.terminate();
+
+                // OCR 결과를 서버에 저장
+                const saveResponse = await fetch('/api/receipts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        imageId,
+                        ocrText: text
+                    })
+                });
+
+                if (!saveResponse.ok) {
+                    throw new Error('OCR 결과 저장 실패');
+                }
 
                 ocrText.textContent = text;
                 ocrResult.classList.remove('hidden');
@@ -175,7 +191,7 @@
                 if (response.ok) {
                     showResult('성공적으로 업로드되었습니다!', 'text-green-600');
                     // 클라이언트 사이드에서 OCR 처리 시작
-                    await processOCR(file);
+                    await processOCR(file, result.imageUrl);
                 } else {
                     throw new Error(result.error || '업로드 실패');
                 }
