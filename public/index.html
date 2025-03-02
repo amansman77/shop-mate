@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shop Mate - 영수증 업로드</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src='https://unpkg.com/tesseract.js@v4.1.1/dist/tesseract.min.js'></script>
     <style>
         .drop-zone {
             border: 2px dashed #cbd5e0;
@@ -52,6 +53,11 @@
             </button>
 
             <div id="resultMessage" class="mt-4 text-center hidden"></div>
+
+            <div id="ocrResult" class="mt-6 p-4 bg-gray-50 rounded-lg hidden">
+                <h2 class="text-lg font-semibold mb-2">OCR 결과</h2>
+                <div id="ocrText" class="text-sm text-gray-700 whitespace-pre-wrap"></div>
+            </div>
         </div>
     </div>
 
@@ -65,6 +71,8 @@
         const uploadProgress = document.getElementById('uploadProgress');
         const progressBar = document.getElementById('progressBar');
         const resultMessage = document.getElementById('resultMessage');
+        const ocrResult = document.getElementById('ocrResult');
+        const ocrText = document.getElementById('ocrText');
 
         // 드래그 앤 드롭 이벤트 처리
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -123,6 +131,26 @@
             reader.readAsDataURL(file);
         }
 
+        async function processOCR(file) {
+            try {
+                showResult('OCR 처리 중...', 'text-blue-600');
+                
+                const worker = await Tesseract.createWorker();
+                await worker.loadLanguage('kor+eng');
+                await worker.initialize('kor+eng');
+                
+                const { data: { text } } = await worker.recognize(file);
+                await worker.terminate();
+
+                ocrText.textContent = text;
+                ocrResult.classList.remove('hidden');
+                showResult('OCR 처리가 완료되었습니다.', 'text-green-600');
+            } catch (error) {
+                console.error('OCR Error:', error);
+                showResult('OCR 처리 중 오류가 발생했습니다: ' + error.message, 'text-red-600');
+            }
+        }
+
         // 파일 업로드
         uploadButton.addEventListener('click', async () => {
             const file = fileInput.files[0];
@@ -134,6 +162,7 @@
             uploadButton.disabled = true;
             uploadProgress.classList.remove('hidden');
             resultMessage.classList.add('hidden');
+            ocrResult.classList.add('hidden');
 
             try {
                 const response = await fetch('/api/images/upload', {
@@ -145,6 +174,8 @@
 
                 if (response.ok) {
                     showResult('성공적으로 업로드되었습니다!', 'text-green-600');
+                    // 클라이언트 사이드에서 OCR 처리 시작
+                    await processOCR(file);
                 } else {
                     throw new Error(result.error || '업로드 실패');
                 }
