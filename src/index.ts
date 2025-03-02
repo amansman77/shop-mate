@@ -168,6 +168,48 @@ app.post('/api/receipts', async (c) => {
   }
 });
 
+app.get('/api/receipts', async (c) => {
+  try {
+    console.log('Fetching receipts list...');
+
+    // Get environment bindings
+    const env = c.env as { DB: D1Database };
+    
+    if (!env.DB) {
+      console.error('D1 database binding not found');
+      return c.json({ 
+        error: 'Database configuration error',
+        details: 'Database not properly configured',
+        debug: { env: Object.keys(c.env) }
+      }, 500);
+    }
+
+    // Fetch receipts from database
+    const result = await env.DB
+      .prepare('SELECT * FROM receipts ORDER BY created_at DESC')
+      .all();
+
+    console.log('Receipts fetched successfully:', {
+      count: result.results.length
+    });
+
+    return c.json({
+      success: true,
+      receipts: result.results
+    });
+  } catch (error) {
+    console.error('Error fetching receipts:', error);
+    return c.json({ 
+      error: 'Failed to fetch receipts',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      debug: {
+        errorType: error?.constructor?.name,
+        errorMessage: error instanceof Error ? error.message : String(error)
+      }
+    }, 500);
+  }
+});
+
 // Serve static files
 app.get('*', async (c) => {
   const env = c.env as { ASSETS: { fetch: (req: Request) => Promise<Response> } };
