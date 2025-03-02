@@ -66,9 +66,26 @@
             </div>
 
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-xl font-bold mb-4">영수증 목록</h2>
-                <div id="receiptsList" class="receipt-list space-y-4">
-                    <!-- 영수증 목록이 여기에 동적으로 추가됩니다 -->
+                <div class="flex flex-col space-y-6">
+                    <div>
+                        <h2 class="text-xl font-bold mb-4">영수증 목록</h2>
+                        
+                        <!-- 검색 UI -->
+                        <div class="flex items-center space-x-4 mb-6 border-b pb-4">
+                            <input type="text" id="searchInput" 
+                                class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                placeholder="영수증 내용 검색...">
+                            <button id="searchButton" 
+                                class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200 flex-shrink-0 font-medium">
+                                검색
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 영수증 목록 -->
+                    <div id="receiptsList" class="receipt-list space-y-4">
+                        <!-- 영수증 목록이 여기에 동적으로 추가됩니다 -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -263,6 +280,71 @@
             resultMessage.className = `mt-4 text-center ${className}`;
             resultMessage.classList.remove('hidden');
         }
+
+        // 검색 기능 구현
+        const searchInput = document.getElementById('searchInput');
+        const searchButton = document.getElementById('searchButton');
+
+        async function searchReceipts(query) {
+            try {
+                const response = await fetch(`/api/receipts/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    const receiptsList = document.getElementById('receiptsList');
+                    receiptsList.innerHTML = ''; // 기존 목록 초기화
+
+                    if (data.receipts.length === 0) {
+                        receiptsList.innerHTML = '<p class="text-center text-gray-500">검색 결과가 없습니다.</p>';
+                        return;
+                    }
+
+                    data.receipts.forEach(receipt => {
+                        const receiptElement = document.createElement('div');
+                        receiptElement.className = 'p-4 bg-gray-50 rounded-lg';
+                        
+                        const createdAt = new Date(receipt.created_at).toLocaleString();
+                        const previewText = receipt.ocr_text.substring(0, 100) + '...';
+                        
+                        receiptElement.innerHTML = `
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-semibold">${receipt.image_id}</h3>
+                                <span class="text-sm text-gray-500">${createdAt}</span>
+                            </div>
+                            <p class="text-sm text-gray-700">${previewText}</p>
+                        `;
+                        
+                        receiptsList.appendChild(receiptElement);
+                    });
+                } else {
+                    console.error('Failed to search receipts:', data.error);
+                }
+            } catch (error) {
+                console.error('Error searching receipts:', error);
+            }
+        }
+
+        // 검색 버튼 클릭 이벤트
+        searchButton.addEventListener('click', () => {
+            const query = searchInput.value.trim();
+            if (query) {
+                searchReceipts(query);
+            } else {
+                fetchReceipts(); // 검색어가 없으면 전체 목록 표시
+            }
+        });
+
+        // Enter 키 입력 이벤트
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const query = searchInput.value.trim();
+                if (query) {
+                    searchReceipts(query);
+                } else {
+                    fetchReceipts();
+                }
+            }
+        });
     </script>
 </body>
 </html> 

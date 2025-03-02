@@ -210,6 +210,72 @@ app.get('/api/receipts', async (c) => {
   }
 });
 
+app.get('/api/receipts/search', async (c) => {
+  try {
+    console.log('Searching receipts...');
+    const query = c.req.query('q');
+
+    if (!query) {
+      return c.json({ 
+        error: 'Missing search query',
+        details: 'Search query parameter "q" is required'
+      }, 400);
+    }
+
+    // Get environment bindings
+    const env = c.env as { DB: D1Database };
+    
+    if (!env.DB) {
+      console.error('D1 database binding not found');
+      return c.json({ 
+        error: 'Database configuration error',
+        details: 'Database not properly configured',
+        debug: { env: Object.keys(c.env) }
+      }, 500);
+    }
+
+    console.log('Searching with query:', query);
+
+    // Search receipts in database with improved Korean text search
+    const searchTerms = query.split('').join('%');
+    const result = await env.DB
+      .prepare(`
+        SELECT * FROM receipts 
+        WHERE ocr_text LIKE ? 
+        OR ocr_text LIKE ? 
+        ORDER BY 
+          CASE 
+            WHEN ocr_text LIKE ? THEN 1
+            ELSE 2
+          END,
+          created_at DESC
+      `)
+      .bind(`%${query}%`, `%${searchTerms}%`, `%${query}%`)
+      .all();
+
+    console.log('Search completed:', {
+      query,
+      searchTerms,
+      count: result.results.length
+    });
+
+    return c.json({
+      success: true,
+      receipts: result.results
+    });
+  } catch (error) {
+    console.error('Error searching receipts:', error);
+    return c.json({ 
+      error: 'Failed to search receipts',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      debug: {
+        errorType: error?.constructor?.name,
+        errorMessage: error instanceof Error ? error.message : String(error)
+      }
+    }, 500);
+  }
+});
+
 // Serve static files
 app.get('*', async (c) => {
   const env = c.env as { ASSETS: { fetch: (req: Request) => Promise<Response> } };
