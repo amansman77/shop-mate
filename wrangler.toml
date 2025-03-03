@@ -1,0 +1,32 @@
+name = "shop-mate"
+main = "src/index.ts"
+compatibility_date = "2024-03-10"
+
+# Static assets handling
+[site]
+bucket = "./public"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "shop_mate_db"
+database_id = "shop_mate_db"  # Replace with your actual database ID
+
+# R2 Storage binding for images
+[[r2_buckets]]
+binding = "SHOP_MATE_IMAGES"
+bucket_name = "shop-mate-images"
+
+# Development environment
+[env.development]
+name = "shop-mate-dev"
+[[env.development.r2_buckets]]
+binding = "SHOP_MATE_IMAGES"
+bucket_name = "shop-mate-images-dev"
+
+# Production environment
+[env.production]
+name = "shop-mate"
+[[env.production.r2_buckets]]
+binding = "SHOP_MATE_IMAGES"
+bucket_name = "shop-mate-images" 
