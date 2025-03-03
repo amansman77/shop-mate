@@ -139,51 +139,82 @@ app.post('/api/receipts', async (c) => {
 
     // 전처리 수행
     const processedData = preprocessReceipt(ocrText);
+    console.log('Preprocessed data:', processedData);
 
-    console.log('Preparing to save OCR result:', {
-      imageId,
-      textLength: ocrText.length,
-      processedData
-    });
+    // 트랜잭션 시작
+    try {
+      const result = await env.DB.batch([
+        // 영수증 기본 정보 저장
+        env.DB
+          .prepare(`
+            INSERT INTO receipts (
+              image_id, 
+              ocr_text, 
+              processed_data,
+              store_name,
+              total_amount,
+              receipt_date,
+              payment_method,
+              card_number,
+              vat_amount
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
+          `)
+          .bind(
+            imageId,
+            ocrText,
+            JSON.stringify(processedData),
+            processedData.storeName || null,
+            processedData.totalAmount || null,
+            processedData.date || null,
+            processedData.paymentMethod || null,
+            processedData.cardNumber || null,
+            processedData.vatAmount || null
+          )
+      ]);
 
-    // Insert OCR result into database with processed data
-    const result = await env.DB
-      .prepare(`
-        INSERT INTO receipts (
-          image_id, 
-          ocr_text, 
-          processed_data,
-          store_name,
-          total_amount,
-          receipt_date,
-          payment_method,
-          card_number,
-          vat_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `)
-      .bind(
-        imageId,
-        ocrText,
-        JSON.stringify(processedData),
-        processedData.storeName,
-        processedData.totalAmount,
-        processedData.date,
-        processedData.paymentMethod,
-        processedData.cardNumber,
-        processedData.vatAmount
-      )
-      .run();
+      const receiptId = result[0].results[0].id;
+      console.log('Receipt saved with ID:', receiptId);
 
-    console.log('OCR result saved successfully:', {
-      meta: result.meta,
-      processedData
-    });
+      // 상품 정보 저장
+      if (processedData.items && processedData.items.length > 0) {
+        console.log('Saving items:', processedData.items);
+        const itemInserts = processedData.items.map(item => 
+          env.DB
+            .prepare(`
+              INSERT INTO receipt_items (
+                receipt_id,
+                name,
+                price,
+                quantity,
+                amount
+              ) VALUES (?, ?, ?, ?, ?)
+            `)
+            .bind(
+              receiptId,
+              item.name,
+              item.price,
+              item.quantity || 1,
+              (item.price * (item.quantity || 1))
+            )
+        );
 
-    return c.json({
-      success: true,
-      meta: result.meta,
-      processedData
-    });
+        await env.DB.batch(itemInserts);
+        console.log('Items saved successfully');
+      }
+
+      return c.json({
+        success: true,
+        receiptId,
+        processedData
+      });
+    } catch (error) {
+      console.error('Database error:', error);
+      return c.json({ 
+        error: 'Failed to save receipt data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
   } catch (error) {
     console.error('Error saving OCR result:', error);
     return c.json({ 

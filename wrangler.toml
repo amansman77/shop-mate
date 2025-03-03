@@ -10,7 +10,7 @@ bucket = "./public"
 [[d1_databases]]
 binding = "DB"
 database_name = "shop_mate_db"
-database_id = "shop_mate_db"  # Replace with your actual database ID
+database_id = "175b94c0-29f0-45f4-91c7-4afda210c9f4"  # Updated with actual database ID
 
 # R2 Storage binding for images
 [[r2_buckets]]
