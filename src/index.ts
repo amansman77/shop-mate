@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { preprocessReceipt } from './utils/receipt-processor';
 
 // Create a new Hono app
 const app = new Hono();
@@ -136,24 +137,52 @@ app.post('/api/receipts', async (c) => {
       }, 500);
     }
 
+    // 전처리 수행
+    const processedData = preprocessReceipt(ocrText);
+
     console.log('Preparing to save OCR result:', {
       imageId,
-      textLength: ocrText.length
+      textLength: ocrText.length,
+      processedData
     });
 
-    // Insert OCR result into database
+    // Insert OCR result into database with processed data
     const result = await env.DB
-      .prepare('INSERT INTO receipts (image_id, ocr_text) VALUES (?, ?)')
-      .bind(imageId, ocrText)
+      .prepare(`
+        INSERT INTO receipts (
+          image_id, 
+          ocr_text, 
+          processed_data,
+          store_name,
+          total_amount,
+          receipt_date,
+          payment_method,
+          card_number,
+          vat_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .bind(
+        imageId,
+        ocrText,
+        JSON.stringify(processedData),
+        processedData.storeName,
+        processedData.totalAmount,
+        processedData.date,
+        processedData.paymentMethod,
+        processedData.cardNumber,
+        processedData.vatAmount
+      )
       .run();
 
     console.log('OCR result saved successfully:', {
-      meta: result.meta
+      meta: result.meta,
+      processedData
     });
 
     return c.json({
       success: true,
-      meta: result.meta
+      meta: result.meta,
+      processedData
     });
   } catch (error) {
     console.error('Error saving OCR result:', error);
