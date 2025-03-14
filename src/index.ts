@@ -300,17 +300,17 @@ app.get('/api/receipts/search', async (c) => {
     const searchTerms = query.split('').join('%');
     const result = await env.DB
       .prepare(`
-        SELECT * FROM receipts 
-        WHERE ocr_text LIKE ? 
-        OR ocr_text LIKE ? 
-        ORDER BY 
-          CASE 
-            WHEN ocr_text LIKE ? THEN 1
-            ELSE 2
-          END,
-          created_at DESC
+        SELECT DISTINCT r.* 
+        FROM receipts r
+        INNER JOIN receipt_items ri ON r.id = ri.receipt_id
+        WHERE ri.name LIKE ?
+        OR ri.name LIKE ?
+        ORDER BY r.created_at DESC
       `)
-      .bind(`%${query}%`, `%${searchTerms}%`, `%${query}%`)
+      .bind(
+        `%${query}%`,
+        `%${searchTerms}%`
+      )
       .all();
 
     console.log('Search completed:', {

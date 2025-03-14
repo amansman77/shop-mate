@@ -213,12 +213,12 @@ function extractItems(text: string): { name: string; price: number; quantity: nu
             // 상품명 정리
             let name = bestMatch.name
                 .replace(/^[0-9Q*\s]+/, '') // 선행 숫자와 특수문자 제거
-                .replace(/\s+/g, ' ') // 연속된 공백을 하나의 공백으로
-                .replace(/^분\s*세\s*차\s*/, '') // "분세차" 접두어 제거
-                .replace(/\s*\d+\s*$/, '') // 끝에 있는 숫자 제거
-                .replace(/\s*\([^)]*\)\s*$/, '') // 괄호와 그 안의 내용 제거
-                .replace(/[._]/g, ' ') // 특수문자를 공백으로 변환
-                .replace(/상\s*품\s*명.*단\s*가.*수\s*량.*금\s*액.*$/, '') // 헤더 제거
+                .replace(/\s+/g, '') // 모든 공백 제거
+                .replace(/^분세차/, '') // "분세차" 접두어 제거
+                .replace(/\d+$/, '') // 끝에 있는 숫자 제거
+                .replace(/\([^)]*\)$/, '') // 괄호와 그 안의 내용 제거
+                .replace(/[._]/g, '') // 특수문자 제거
+                .replace(/상품명.*단가.*수량.*금액.*$/, '') // 헤더 제거
                 .trim();
             
             // 중복 상품 체크
