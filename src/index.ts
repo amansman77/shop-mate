@@ -336,6 +336,86 @@ app.get('/api/receipts/search', async (c) => {
   }
 });
 
+app.delete('/api/receipts/:id', async (c) => {
+  try {
+    console.log('Starting receipt deletion process...');
+    
+    const receiptId = c.req.param('id');
+    if (!receiptId) {
+      return c.json({ 
+        error: 'Missing receipt ID',
+        details: 'Receipt ID is required'
+      }, 400);
+    }
+
+    // Get environment bindings
+    const env = c.env as { DB: D1Database, SHOP_MATE_IMAGES: R2Bucket };
+    
+    if (!env.DB) {
+      console.error('D1 database binding not found');
+      return c.json({ 
+        error: 'Database configuration error',
+        details: 'Database not properly configured'
+      }, 500);
+    }
+
+    // Start transaction
+    try {
+      // 1. Get receipt information first (to get image_id)
+      const receipt = await env.DB
+        .prepare('SELECT image_id FROM receipts WHERE id = ?')
+        .bind(receiptId)
+        .first();
+
+      if (!receipt) {
+        return c.json({ 
+          error: 'Receipt not found',
+          details: `No receipt found with ID: ${receiptId}`
+        }, 404);
+      }
+
+      // 2. Delete associated items first (foreign key constraint)
+      await env.DB
+        .prepare('DELETE FROM receipt_items WHERE receipt_id = ?')
+        .bind(receiptId)
+        .run();
+
+      // 3. Delete the receipt record
+      await env.DB
+        .prepare('DELETE FROM receipts WHERE id = ?')
+        .bind(receiptId)
+        .run();
+
+      // 4. Delete the image from R2 if it exists
+      if (env.SHOP_MATE_IMAGES && receipt.image_id) {
+        try {
+          await env.SHOP_MATE_IMAGES.delete(receipt.image_id);
+        } catch (imageError) {
+          console.error('Failed to delete image from R2:', imageError);
+          // We don't want to fail the whole operation if image deletion fails
+        }
+      }
+
+      return c.json({
+        success: true,
+        message: 'Receipt and associated data deleted successfully'
+      });
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      return c.json({ 
+        error: 'Failed to delete receipt',
+        details: dbError instanceof Error ? dbError.message : 'Unknown database error'
+      }, 500);
+    }
+  } catch (error) {
+    console.error('Error deleting receipt:', error);
+    return c.json({ 
+      error: 'Failed to process deletion request',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
+});
+
 // Serve static files
 app.get('*', async (c) => {
   const env = c.env as { ASSETS: { fetch: (req: Request) => Promise<Response> } };
