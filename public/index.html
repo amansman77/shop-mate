@@ -95,10 +95,21 @@
     </div>
 
     <script>
+        // 디바이스 ID 관리
+        function getDeviceId() {
+            let deviceId = localStorage.getItem('deviceId');
+            if (!deviceId) {
+                deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+                localStorage.setItem('deviceId', deviceId);
+            }
+            return deviceId;
+        }
+
         // 영수증 목록을 가져오는 함수
         async function fetchReceipts() {
             try {
-                const response = await fetch('/api/receipts');
+                const deviceId = getDeviceId();
+                const response = await fetch(`/api/receipts?deviceId=${encodeURIComponent(deviceId)}`);
                 const data = await response.json();
 
                 if (response.ok) {
@@ -287,6 +298,7 @@
                 await worker.terminate();
 
                 // OCR 결과를 서버에 저장
+                const deviceId = getDeviceId();
                 const saveResponse = await fetch('/api/receipts', {
                     method: 'POST',
                     headers: {
@@ -294,7 +306,8 @@
                     },
                     body: JSON.stringify({
                         imageId,
-                        ocrText: text
+                        ocrText: text,
+                        deviceId
                     })
                 });
 
@@ -362,7 +375,8 @@
 
         async function searchReceipts(query) {
             try {
-                const response = await fetch(`/api/receipts/search?q=${encodeURIComponent(query)}`);
+                const deviceId = getDeviceId();
+                const response = await fetch(`/api/receipts/search?q=${encodeURIComponent(query)}&deviceId=${encodeURIComponent(deviceId)}`);
                 const data = await response.json();
 
                 if (response.ok) {
@@ -415,7 +429,8 @@
                 
                 if (confirm('정말로 이 영수증을 삭제하시겠습니까?')) {
                     try {
-                        const response = await fetch(`/api/receipts/${receiptId}`, {
+                        const deviceId = getDeviceId();
+                        const response = await fetch(`/api/receipts/${receiptId}?deviceId=${encodeURIComponent(deviceId)}`, {
                             method: 'DELETE'
                         });
 

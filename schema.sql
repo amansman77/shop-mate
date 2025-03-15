@@ -1,6 +1,9 @@
+DROP TABLE IF EXISTS receipt_items;
 DROP TABLE IF EXISTS receipts;
+
 CREATE TABLE receipts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT NOT NULL,             -- 디바이스 식별자
     image_id TEXT NOT NULL,
     ocr_text TEXT NOT NULL,
     processed_data TEXT,
@@ -26,6 +29,7 @@ CREATE TABLE receipt_items (
 );
 
 -- 검색을 위한 인덱스
+CREATE INDEX idx_receipts_device_id ON receipts(device_id);
 CREATE INDEX idx_receipts_store_name ON receipts(store_name);
 CREATE INDEX idx_receipts_date ON receipts(receipt_date);
 CREATE INDEX idx_receipt_items_name ON receipt_items(name); 

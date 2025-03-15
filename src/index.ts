@@ -115,13 +115,13 @@ app.post('/api/receipts', async (c) => {
     const body = await c.req.json();
     console.log('Received OCR data:', body);
 
-    const { imageId, ocrText } = body;
+    const { imageId, ocrText, deviceId } = body;
 
-    if (!imageId || !ocrText) {
-      console.log('Missing required fields:', { imageId, ocrText });
+    if (!imageId || !ocrText || !deviceId) {
+      console.log('Missing required fields:', { imageId, ocrText, deviceId });
       return c.json({ 
         error: 'Missing required fields',
-        details: 'Both imageId and ocrText are required'
+        details: 'imageId, ocrText, and deviceId are required'
       }, 400);
     }
 
@@ -148,6 +148,7 @@ app.post('/api/receipts', async (c) => {
         env.DB
           .prepare(`
             INSERT INTO receipts (
+              device_id,
               image_id, 
               ocr_text, 
               processed_data,
@@ -157,10 +158,11 @@ app.post('/api/receipts', async (c) => {
               payment_method,
               card_number,
               vat_amount
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
           `)
           .bind(
+            deviceId,
             imageId,
             ocrText,
             JSON.stringify(processedData),
@@ -231,6 +233,15 @@ app.post('/api/receipts', async (c) => {
 app.get('/api/receipts', async (c) => {
   try {
     console.log('Fetching receipts list...');
+    
+    const deviceId = c.req.query('deviceId');
+    
+    if (!deviceId) {
+      return c.json({ 
+        error: 'Missing device ID',
+        details: 'Device ID is required'
+      }, 400);
+    }
 
     // Get environment bindings
     const env = c.env as { DB: D1Database };
@@ -263,9 +274,11 @@ app.get('/api/receipts', async (c) => {
           ) as items
         FROM receipts r
         LEFT JOIN receipt_items ri ON r.id = ri.receipt_id
+        WHERE r.device_id = ?
         GROUP BY r.id
         ORDER BY r.created_at DESC
       `)
+      .bind(deviceId)
       .all();
 
     console.log('Receipts fetched successfully:', {
@@ -301,11 +314,12 @@ app.get('/api/receipts/search', async (c) => {
   try {
     console.log('Searching receipts...');
     const query = c.req.query('q');
+    const deviceId = c.req.query('deviceId');
 
-    if (!query) {
+    if (!query || !deviceId) {
       return c.json({ 
-        error: 'Missing search query',
-        details: 'Search query parameter "q" is required'
+        error: 'Missing required parameters',
+        details: 'Both search query (q) and device ID (deviceId) are required'
       }, 400);
     }
 
@@ -343,12 +357,13 @@ app.get('/api/receipts/search', async (c) => {
           ) as items
         FROM receipts r
         INNER JOIN receipt_items ri ON r.id = ri.receipt_id
-        WHERE ri.name LIKE ?
-        OR ri.name LIKE ?
+        WHERE r.device_id = ?
+        AND (ri.name LIKE ? OR ri.name LIKE ?)
         GROUP BY r.id
         ORDER BY r.created_at DESC
       `)
       .bind(
+        deviceId,
         `%${query}%`,
         `%${searchTerms}%`
       )
@@ -390,10 +405,12 @@ app.delete('/api/receipts/:id', async (c) => {
     console.log('Starting receipt deletion process...');
     
     const receiptId = c.req.param('id');
-    if (!receiptId) {
+    const deviceId = c.req.query('deviceId');
+    
+    if (!receiptId || !deviceId) {
       return c.json({ 
-        error: 'Missing receipt ID',
-        details: 'Receipt ID is required'
+        error: 'Missing required parameters',
+        details: 'Both receipt ID and device ID are required'
       }, 400);
     }
 
@@ -412,14 +429,14 @@ app.delete('/api/receipts/:id', async (c) => {
     try {
       // 1. Get receipt information first (to get image_id)
       const receipt = await env.DB
-        .prepare('SELECT image_id FROM receipts WHERE id = ?')
-        .bind(receiptId)
+        .prepare('SELECT image_id FROM receipts WHERE id = ? AND device_id = ?')
+        .bind(receiptId, deviceId)
         .first();
 
       if (!receipt) {
         return c.json({ 
           error: 'Receipt not found',
-          details: `No receipt found with ID: ${receiptId}`
+          details: `No receipt found with ID: ${receiptId} for this device`
         }, 404);
       }
 
@@ -431,8 +448,8 @@ app.delete('/api/receipts/:id', async (c) => {
 
       // 3. Delete the receipt record
       await env.DB
-        .prepare('DELETE FROM receipts WHERE id = ?')
-        .bind(receiptId)
+        .prepare('DELETE FROM receipts WHERE id = ? AND device_id = ?')
+        .bind(receiptId, deviceId)
         .run();
 
       // 4. Delete the image from R2 if it exists
