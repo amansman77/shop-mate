@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Shop Mate - 영수증 업로드</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src='https://unpkg.com/tesseract.js@v4.1.1/dist/tesseract.min.js'></script>
@@ -92,6 +95,111 @@
     </div>
 
     <script>
+        // 영수증 목록을 가져오는 함수
+        async function fetchReceipts() {
+            try {
+                const response = await fetch('/api/receipts');
+                const data = await response.json();
+
+                if (response.ok) {
+                    const receiptsList = document.getElementById('receiptsList');
+                    receiptsList.innerHTML = ''; // 기존 목록 초기화
+
+                    if (data.receipts && data.receipts.length > 0) {
+                        data.receipts.forEach(receipt => {
+                            receiptsList.appendChild(createReceiptCard(receipt));
+                        });
+                    } else {
+                        receiptsList.innerHTML = '<p class="text-center text-gray-500">등록된 영수증이 없습니다.</p>';
+                    }
+                } else {
+                    throw new Error(data.error || '영수증 목록을 가져오는데 실패했습니다.');
+                }
+            } catch (error) {
+                console.error('Error fetching receipts:', error);
+                const receiptsList = document.getElementById('receiptsList');
+                receiptsList.innerHTML = '<p class="text-center text-red-500">영수증 목록을 불러오는데 실패했습니다.</p>';
+            }
+        }
+
+        // 영수증 카드 생성 함수
+        function createReceiptCard(receipt) {
+            const receiptElement = document.createElement('div');
+            receiptElement.className = 'p-4 bg-gray-50 rounded-lg';
+            
+            const createdAt = new Date(receipt.created_at).toLocaleString();
+            const processedData = receipt.processed_data ? JSON.parse(receipt.processed_data) : null;
+            const storeName = receipt.store_name || '상점명 없음';
+            const totalAmount = receipt.total_amount ? `${receipt.total_amount.toLocaleString()}원` : '금액 정보 없음';
+            const date = receipt.receipt_date || '날짜 정보 없음';
+            
+            receiptElement.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-semibold">${storeName}</h3>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-gray-500">${date}</span>
+                        <button class="delete-receipt text-red-500 hover:text-red-700" data-id="${receipt.id}" title="영수증 삭제">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-lg font-bold text-blue-600">${totalAmount}</span>
+                </div>
+                <div class="mt-2 pt-2 border-t">
+                    <p class="text-xs text-gray-500">등록일: ${createdAt}</p>
+                </div>
+            `;
+            
+            // 상세 정보 토글 버튼 추가
+            const detailsButton = document.createElement('button');
+            detailsButton.className = 'mt-2 text-sm text-blue-500 hover:text-blue-700 font-medium';
+            detailsButton.textContent = '구매 항목 보기';
+            
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'mt-2 hidden';
+            
+            if (processedData && processedData.items && processedData.items.length > 0) {
+                const itemsList = processedData.items.map(item => `
+                    <div class="flex justify-between py-2 border-b last:border-b-0">
+                        <div class="flex-1">
+                            <span class="font-medium">${item.name}</span>
+                            ${item.quantity ? `<span class="text-gray-500 ml-2">${item.quantity}개</span>` : ''}
+                        </div>
+                        <span class="font-medium ml-4">${item.price.toLocaleString()}원</span>
+                    </div>
+                `).join('');
+                
+                detailsDiv.innerHTML = `
+                    <div class="mt-2 p-3 bg-white rounded border">
+                        <div class="space-y-2">
+                            ${itemsList}
+                        </div>
+                    </div>
+                `;
+            } else {
+                detailsDiv.innerHTML = `
+                    <div class="mt-2 p-3 bg-white rounded border">
+                        <p class="text-gray-500">상세 품목 정보가 없습니다.</p>
+                    </div>
+                `;
+            }
+            
+            detailsButton.addEventListener('click', () => {
+                detailsDiv.classList.toggle('hidden');
+                detailsButton.textContent = detailsDiv.classList.contains('hidden') 
+                    ? '구매 항목 보기' 
+                    : '구매 항목 닫기';
+            });
+            
+            receiptElement.appendChild(detailsButton);
+            receiptElement.appendChild(detailsDiv);
+            
+            return receiptElement;
+        }
+
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
         const uploadButton = document.getElementById('uploadButton');
@@ -103,6 +211,11 @@
         const resultMessage = document.getElementById('resultMessage');
         const ocrResult = document.getElementById('ocrResult');
         const ocrText = document.getElementById('ocrText');
+
+        // 페이지 로드 시 영수증 목록 바로 가져오기
+        window.onload = () => {
+            fetchReceipts();
+        };
 
         // 드래그 앤 드롭 이벤트 처리
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -160,106 +273,6 @@
             }
             reader.readAsDataURL(file);
         }
-
-        // 영수증 목록을 가져오는 함수
-        async function fetchReceipts() {
-            try {
-                const response = await fetch('/api/receipts');
-                const data = await response.json();
-
-                if (response.ok) {
-                    const receiptsList = document.getElementById('receiptsList');
-                    receiptsList.innerHTML = ''; // 기존 목록 초기화
-
-                    data.receipts.forEach(receipt => {
-                        const receiptElement = document.createElement('div');
-                        receiptElement.className = 'p-4 bg-gray-50 rounded-lg';
-                        
-                        const createdAt = new Date(receipt.created_at).toLocaleString();
-                        
-                        // 전처리된 데이터 표시
-                        const processedData = receipt.processed_data ? JSON.parse(receipt.processed_data) : null;
-                        const storeName = receipt.store_name || '상점명 없음';
-                        const totalAmount = receipt.total_amount ? `${receipt.total_amount.toLocaleString()}원` : '금액 정보 없음';
-                        const date = receipt.receipt_date || '날짜 정보 없음';
-                        
-                        receiptElement.innerHTML = `
-                            <div class="flex justify-between items-start mb-2">
-                                <h3 class="font-semibold">${storeName}</h3>
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-sm text-gray-500">${date}</span>
-                                    <button class="delete-receipt text-red-500 hover:text-red-700" data-id="${receipt.id}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="text-lg font-bold text-blue-600">${totalAmount}</span>
-                                <span class="text-sm text-gray-600">${receipt.payment_method || ''}</span>
-                            </div>
-                            <div class="text-sm text-gray-700 mt-2">
-                                ${receipt.card_number ? `<p class="text-gray-500">카드번호: ${receipt.card_number}</p>` : ''}
-                                ${receipt.vat_amount ? `<p class="text-gray-500">부가세: ${receipt.vat_amount.toLocaleString()}원</p>` : ''}
-                            </div>
-                            <div class="mt-2 pt-2 border-t">
-                                <p class="text-xs text-gray-500">등록일: ${createdAt}</p>
-                            </div>
-                        `;
-                        
-                        // 상세 정보 토글 버튼 추가
-                        const detailsButton = document.createElement('button');
-                        detailsButton.className = 'mt-2 text-sm text-blue-500 hover:text-blue-700';
-                        detailsButton.textContent = '상세 정보 보기';
-                        
-                        const detailsDiv = document.createElement('div');
-                        detailsDiv.className = 'mt-2 hidden';
-                        
-                        if (processedData && processedData.items && processedData.items.length > 0) {
-                            const itemsList = processedData.items.map(item => `
-                                <div class="flex justify-between py-1">
-                                    <span>${item.name} ${item.quantity ? `(${item.quantity}개)` : ''}</span>
-                                    <span>${item.price.toLocaleString()}원</span>
-                                </div>
-                            `).join('');
-                            
-                            detailsDiv.innerHTML = `
-                                <div class="mt-2 p-2 bg-white rounded border">
-                                    <h4 class="font-medium mb-2">구매 항목</h4>
-                                    ${itemsList}
-                                </div>
-                            `;
-                        } else {
-                            detailsDiv.innerHTML = `
-                                <div class="mt-2 p-2 bg-white rounded border">
-                                    <p class="text-gray-500">상세 품목 정보가 없습니다.</p>
-                                </div>
-                            `;
-                        }
-                        
-                        detailsButton.addEventListener('click', () => {
-                            detailsDiv.classList.toggle('hidden');
-                            detailsButton.textContent = detailsDiv.classList.contains('hidden') 
-                                ? '상세 정보 보기' 
-                                : '상세 정보 닫기';
-                        });
-                        
-                        receiptElement.appendChild(detailsButton);
-                        receiptElement.appendChild(detailsDiv);
-                        
-                        receiptsList.appendChild(receiptElement);
-                    });
-                } else {
-                    console.error('Failed to fetch receipts:', data.error);
-                }
-            } catch (error) {
-                console.error('Error fetching receipts:', error);
-            }
-        }
-
-        // 페이지 로드 시 영수증 목록 가져오기
-        document.addEventListener('DOMContentLoaded', fetchReceipts);
 
         // OCR 처리 완료 후 목록 갱신
         async function processOCR(file, imageId) {
@@ -362,83 +375,7 @@
                     }
 
                     data.receipts.forEach(receipt => {
-                        const receiptElement = document.createElement('div');
-                        receiptElement.className = 'p-4 bg-gray-50 rounded-lg';
-                        
-                        const createdAt = new Date(receipt.created_at).toLocaleString();
-                        
-                        // 전처리된 데이터 표시
-                        const processedData = receipt.processed_data ? JSON.parse(receipt.processed_data) : null;
-                        const storeName = receipt.store_name || '상점명 없음';
-                        const totalAmount = receipt.total_amount ? `${receipt.total_amount.toLocaleString()}원` : '금액 정보 없음';
-                        const date = receipt.receipt_date || '날짜 정보 없음';
-                        
-                        receiptElement.innerHTML = `
-                            <div class="flex justify-between items-start mb-2">
-                                <h3 class="font-semibold">${storeName}</h3>
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-sm text-gray-500">${date}</span>
-                                    <button class="delete-receipt text-red-500 hover:text-red-700" data-id="${receipt.id}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="text-lg font-bold text-blue-600">${totalAmount}</span>
-                                <span class="text-sm text-gray-600">${receipt.payment_method || ''}</span>
-                            </div>
-                            <div class="text-sm text-gray-700 mt-2">
-                                ${receipt.card_number ? `<p class="text-gray-500">카드번호: ${receipt.card_number}</p>` : ''}
-                                ${receipt.vat_amount ? `<p class="text-gray-500">부가세: ${receipt.vat_amount.toLocaleString()}원</p>` : ''}
-                            </div>
-                            <div class="mt-2 pt-2 border-t">
-                                <p class="text-xs text-gray-500">등록일: ${createdAt}</p>
-                            </div>
-                        `;
-                        
-                        // 상세 정보 토글 버튼 추가
-                        const detailsButton = document.createElement('button');
-                        detailsButton.className = 'mt-2 text-sm text-blue-500 hover:text-blue-700';
-                        detailsButton.textContent = '상세 정보 보기';
-                        
-                        const detailsDiv = document.createElement('div');
-                        detailsDiv.className = 'mt-2 hidden';
-                        
-                        if (processedData && processedData.items && processedData.items.length > 0) {
-                            const itemsList = processedData.items.map(item => `
-                                <div class="flex justify-between py-1">
-                                    <span>${item.name} ${item.quantity ? `(${item.quantity}개)` : ''}</span>
-                                    <span>${item.price.toLocaleString()}원</span>
-                                </div>
-                            `).join('');
-                            
-                            detailsDiv.innerHTML = `
-                                <div class="mt-2 p-2 bg-white rounded border">
-                                    <h4 class="font-medium mb-2">구매 항목</h4>
-                                    ${itemsList}
-                                </div>
-                            `;
-                        } else {
-                            detailsDiv.innerHTML = `
-                                <div class="mt-2 p-2 bg-white rounded border">
-                                    <p class="text-gray-500">상세 품목 정보가 없습니다.</p>
-                                </div>
-                            `;
-                        }
-                        
-                        detailsButton.addEventListener('click', () => {
-                            detailsDiv.classList.toggle('hidden');
-                            detailsButton.textContent = detailsDiv.classList.contains('hidden') 
-                                ? '상세 정보 보기' 
-                                : '상세 정보 닫기';
-                        });
-                        
-                        receiptElement.appendChild(detailsButton);
-                        receiptElement.appendChild(detailsDiv);
-                        
-                        receiptsList.appendChild(receiptElement);
+                        receiptsList.appendChild(createReceiptCard(receipt));
                     });
                 } else {
                     console.error('Failed to search receipts:', data.error);

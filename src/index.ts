@@ -246,16 +246,43 @@ app.get('/api/receipts', async (c) => {
 
     // Fetch receipts from database
     const result = await env.DB
-      .prepare('SELECT * FROM receipts ORDER BY created_at DESC')
+      .prepare(`
+        SELECT 
+          r.id,
+          r.image_id,
+          r.store_name,
+          r.total_amount,
+          r.receipt_date,
+          r.created_at,
+          json_group_array(
+            json_object(
+              'name', ri.name,
+              'price', ri.price,
+              'quantity', ri.quantity
+            )
+          ) as items
+        FROM receipts r
+        LEFT JOIN receipt_items ri ON r.id = ri.receipt_id
+        GROUP BY r.id
+        ORDER BY r.created_at DESC
+      `)
       .all();
 
     console.log('Receipts fetched successfully:', {
       count: result.results.length
     });
 
+    // Process the results to format items properly
+    const receipts = result.results.map(receipt => ({
+      ...receipt,
+      processed_data: JSON.stringify({
+        items: JSON.parse(receipt.items).filter(item => item.name !== null)
+      })
+    }));
+
     return c.json({
       success: true,
-      receipts: result.results
+      receipts
     });
   } catch (error) {
     console.error('Error fetching receipts:', error);
@@ -300,11 +327,25 @@ app.get('/api/receipts/search', async (c) => {
     const searchTerms = query.split('').join('%');
     const result = await env.DB
       .prepare(`
-        SELECT DISTINCT r.* 
+        SELECT 
+          r.id,
+          r.image_id,
+          r.store_name,
+          r.total_amount,
+          r.receipt_date,
+          r.created_at,
+          json_group_array(
+            json_object(
+              'name', ri.name,
+              'price', ri.price,
+              'quantity', ri.quantity
+            )
+          ) as items
         FROM receipts r
         INNER JOIN receipt_items ri ON r.id = ri.receipt_id
         WHERE ri.name LIKE ?
         OR ri.name LIKE ?
+        GROUP BY r.id
         ORDER BY r.created_at DESC
       `)
       .bind(
@@ -319,9 +360,17 @@ app.get('/api/receipts/search', async (c) => {
       count: result.results.length
     });
 
+    // Process the results to format items properly
+    const receipts = result.results.map(receipt => ({
+      ...receipt,
+      processed_data: JSON.stringify({
+        items: JSON.parse(receipt.items).filter(item => item.name !== null)
+      })
+    }));
+
     return c.json({
       success: true,
-      receipts: result.results
+      receipts
     });
   } catch (error) {
     console.error('Error searching receipts:', error);
