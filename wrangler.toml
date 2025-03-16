@@ -10,23 +10,9 @@ bucket = "./public"
 [[d1_databases]]
 binding = "DB"
 database_name = "shop_mate_db"
-database_id = "175b94c0-29f0-45f4-91c7-4afda210c9f4"  # Updated with actual database ID
+database_id = "175b94c0-29f0-45f4-91c7-4afda210c9f4"
 
 # R2 Storage binding for images
 [[r2_buckets]]
-binding = "SHOP_MATE_IMAGES"
-bucket_name = "shop-mate-images"
-
-# Development environment
-[env.development]
-name = "shop-mate-dev"
-[[env.development.r2_buckets]]
-binding = "SHOP_MATE_IMAGES"
-bucket_name = "shop-mate-images-dev"
-
-# Production environment
-[env.production]
-name = "shop-mate"
-[[env.production.r2_buckets]]
 binding = "SHOP_MATE_IMAGES"
 bucket_name = "shop-mate-images" 
