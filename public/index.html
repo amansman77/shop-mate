@@ -61,11 +61,6 @@
                 </button>
 
                 <div id="resultMessage" class="mt-4 text-center hidden"></div>
-
-                <div id="ocrResult" class="mt-6 p-4 bg-gray-50 rounded-lg hidden">
-                    <h2 class="text-lg font-semibold mb-2">OCR 결과</h2>
-                    <div id="ocrText" class="text-sm text-gray-700 whitespace-pre-wrap"></div>
-                </div>
             </div>
 
             <div class="bg-white rounded-lg shadow-lg p-6">
@@ -220,8 +215,6 @@
         const uploadProgress = document.getElementById('uploadProgress');
         const progressBar = document.getElementById('progressBar');
         const resultMessage = document.getElementById('resultMessage');
-        const ocrResult = document.getElementById('ocrResult');
-        const ocrText = document.getElementById('ocrText');
 
         // 페이지 로드 시 영수증 목록 바로 가져오기
         window.onload = () => {
@@ -315,12 +308,16 @@
                     throw new Error('OCR 결과 저장 실패');
                 }
 
-                ocrText.textContent = text;
-                ocrResult.classList.remove('hidden');
-                showResult('OCR 처리가 완료되었습니다.', 'text-green-600');
+                showResult('영수증이 성공적으로 등록되었습니다.', 'text-green-600');
 
                 // 영수증 목록 갱신
                 await fetchReceipts();
+
+                // 업로드 영역 초기화
+                fileInput.value = '';
+                previewContainer.classList.add('hidden');
+                dropText.classList.remove('hidden');
+                uploadButton.disabled = true;
             } catch (error) {
                 console.error('OCR Error:', error);
                 showResult('OCR 처리 중 오류가 발생했습니다: ' + error.message, 'text-red-600');
@@ -338,7 +335,6 @@
             uploadButton.disabled = true;
             uploadProgress.classList.remove('hidden');
             resultMessage.classList.add('hidden');
-            ocrResult.classList.add('hidden');
 
             try {
                 const response = await fetch('/api/images/upload', {
@@ -349,16 +345,15 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    showResult('성공적으로 업로드되었습니다!', 'text-green-600');
-                    // 클라이언트 사이드에서 OCR 처리 시작
+                    showResult('이미지 업로드 완료, OCR 처리 중...', 'text-blue-600');
                     await processOCR(file, result.imageUrl);
                 } else {
                     throw new Error(result.error || '업로드 실패');
                 }
             } catch (error) {
                 showResult(error.message, 'text-red-600');
-            } finally {
                 uploadButton.disabled = false;
+            } finally {
                 uploadProgress.classList.add('hidden');
             }
         });
