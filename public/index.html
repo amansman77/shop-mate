@@ -139,11 +139,27 @@
             const totalAmount = receipt.total_amount ? `${receipt.total_amount.toLocaleString()}원` : '금액 정보 없음';
             const date = receipt.receipt_date || '날짜 정보 없음';
             
+            // 날짜 포맷팅 함수
+            function formatDate(dateStr) {
+                if (!dateStr) return '날짜 정보 없음';
+                try {
+                    const date = new Date(dateStr);
+                    if (isNaN(date.getTime())) return dateStr; // 원본 문자열 반환
+                    return date.toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        weekday: 'long'
+                    });
+                } catch (e) {
+                    return dateStr; // 파싱 실패시 원본 문자열 반환
+                }
+            }
+            
             receiptElement.innerHTML = `
                 <div class="flex justify-between items-start mb-2">
                     <h3 class="font-semibold">${storeName}</h3>
                     <div class="flex items-center space-x-2">
-                        <span class="text-sm text-gray-500">${date}</span>
                         <button class="delete-receipt text-red-500 hover:text-red-700" data-id="${receipt.id}" title="영수증 삭제">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
@@ -153,9 +169,7 @@
                 </div>
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-lg font-bold text-blue-600">${totalAmount}</span>
-                </div>
-                <div class="mt-2 pt-2 border-t">
-                    <p class="text-xs text-gray-500">등록일: ${createdAt}</p>
+                    <span class="text-sm text-gray-600">${formatDate(date)}</span>
                 </div>
             `;
             
