@@ -20,11 +20,11 @@ describe('영수증 전처리 테스트', () => {
 
         // 상품 목록 검증
         expect(result.items).toBeDefined();
-        expect(result.items?.length).toBeGreaterThanOrEqual(8);
+        expect(result.items.length).toBeGreaterThanOrEqual(8);
 
         // 특정 상품 검증
-        const targetItem = result.items?.find(item => 
-            item.name?.includes('리 치 버 블 카 샴') &&
+        const targetItem = result.items.find(item => 
+            item.name === '리치버블카샴' &&
             item.price === 9800 &&
             item.quantity === 1
         );
@@ -41,8 +41,8 @@ describe('영수증 전처리 테스트', () => {
         console.log('- 카드번호:', result.cardNumber);
         
         console.log('\n상품 목록:');
-        result.items?.forEach(item => {
-            console.log(`- ${item.name}: ${item.price?.toLocaleString()}원 ${item.quantity ? `(${item.quantity}개)` : ''}`);
+        result.items.forEach(item => {
+            console.log(`- ${item.name}: ${item.price.toLocaleString()}원 ${item.quantity ? `(${item.quantity}개)` : ''}`);
         });
     });
 }); 
