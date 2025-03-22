@@ -1,14 +1,12 @@
 import { ReceiptParser, ReceiptProcessingError } from '../types';
 import { EmartReceiptParser } from './emart-parser';
+import { TradersReceiptParser } from './traders-parser';
 
 export class ReceiptParserFactory {
-    private parsers: ReceiptParser[];
-
-    constructor() {
-        this.parsers = [
-            new EmartReceiptParser()
-        ];
-    }
+    private parsers: ReceiptParser[] = [
+        new EmartReceiptParser(),
+        new TradersReceiptParser()
+    ];
 
     getParser(text: string): ReceiptParser {
         const parser = this.parsers.find(p => p.canParse(text));
