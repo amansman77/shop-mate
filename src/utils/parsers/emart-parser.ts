@@ -2,7 +2,7 @@ import { ReceiptParser, ProcessedReceipt, ReceiptProcessingError, ReceiptItem } 
 
 export class EmartReceiptParser implements ReceiptParser {
     canParse(text: string): boolean {
-        return /이\s*마\s*트\s*파\s*주\s*점/.test(text);
+        return /이\s*마\s*트/i.test(text);
     }
 
     parse(text: string): ProcessedReceipt {
@@ -22,12 +22,12 @@ export class EmartReceiptParser implements ReceiptParser {
         cleanedText = cleanedText.replace(/\n+/g, '\n');
 
         // 4. 상점명 추출
-        const storePattern = /이\s*마\s*트\s*파\s*주\s*점/;
+        const storePattern = /이\s*마\s*트\s*([^0-9\n]+점)/;
         const storeMatch = cleanedText.match(storePattern);
         if (!storeMatch) {
             throw new ReceiptProcessingError('상점명을 찾을 수 없습니다.');
         }
-        const storeName = storeMatch[0].replace(/\s+/g, '');
+        const storeName = `이마트${storeMatch[1].replace(/\s+/g, '')}`;
 
         // 5. 날짜 추출
         const datePattern = /20\d{2}[-./]?(?:0[1-9]|1[0-2])[-./]?(?:0[1-9]|[12][0-9]|3[01])/;

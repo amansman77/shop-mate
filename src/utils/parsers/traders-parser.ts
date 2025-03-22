@@ -22,12 +22,12 @@ export class TradersReceiptParser implements ReceiptParser {
         cleanedText = cleanedText.replace(/\n+/g, '\n');
 
         // 4. 상점명 추출
-        const storePattern = /트\s*레\s*이\s*더\s*스\s*홀\s*세\s*일\s*클\s*럽\s*킨\s*텍\s*스\s*점/;
+        const storePattern = /트\s*레\s*이\s*더\s*스\s*홀?\s*세\s*일\s*클\s*럽\s*([^0-9\n]+점)/;
         const storeMatch = cleanedText.match(storePattern);
         if (!storeMatch) {
             throw new Error('상점명을 찾을 수 없습니다.');
         }
-        const storeName = storeMatch[0].replace(/\s+/g, '').replace(/(트레이더스)(홀세일)(클럽)(킨텍스점)/, '$1 $2 $3 $4');
+        const storeName = `트레이더스 홀세일 클럽 ${storeMatch[1].replace(/\s+/g, '')}`;
 
         // 5. 날짜 추출
         const datePattern = /20\d{2}[-./]?(?:0[1-9]|1[0-2])[-./]?(?:0[1-9]|[12][0-9]|3[01])/;
